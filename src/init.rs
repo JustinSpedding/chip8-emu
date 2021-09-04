@@ -32,7 +32,6 @@ pub fn init_state() -> State {
         index: 0,
         pc: PROGRAM_START_ADDRESS,
         sp: 0,
-        opcode: 0,
         delay_timer: 0,
         sound_timer: 0,
     };

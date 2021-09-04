@@ -1,3 +1,4 @@
+mod cpu;
 mod init;
 mod opcodes;
 mod state;

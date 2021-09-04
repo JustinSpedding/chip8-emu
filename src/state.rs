@@ -7,7 +7,6 @@ pub struct State {
     pub index: u16,
     pub pc: u16,
     pub sp: u8,
-    pub opcode: u16,
     pub delay_timer: u8,
     pub sound_timer: u8,
 }
