@@ -1,4 +1,6 @@
 use crate::state::State;
+use std::fs;
+use std::io::Read;
 
 pub static PROGRAM_START_ADDRESS: u16 = 0x200;
 pub static FONT_SET_START_ADDRESS: usize = 0x50;
@@ -22,7 +24,7 @@ static FONT_SET: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
-pub fn init_state() -> State {
+pub fn init_state(rom_path: &str) -> State {
     let mut state = State {
         registers: [0; 16],
         memory: [0; 4096],
@@ -36,5 +38,11 @@ pub fn init_state() -> State {
         sound_timer: 0,
     };
     state.memory[FONT_SET_START_ADDRESS..FONT_SET_START_ADDRESS + 80].clone_from_slice(&FONT_SET);
+    load_rom(&mut state, rom_path);
     return state;
+}
+
+fn load_rom(state: &mut State, rom_path: &str) {
+    let mut f = fs::File::open(&rom_path).expect("no file found");
+    f.read(&mut state.memory[PROGRAM_START_ADDRESS as usize..4096]).expect("rom too large");
 }
