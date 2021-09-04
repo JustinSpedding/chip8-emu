@@ -187,7 +187,6 @@ pub fn op_FX07(state: &mut State, opcode: u16) {
 
 pub fn op_FX0A(state: &mut State, opcode: u16) {
     let register1 = ((opcode & 0x0F00) >> 8) as usize;
-    state.registers[register1] = state.delay_timer;
     let pressed_key = state.keypad.iter().position(|key| *key);
     match pressed_key {
         Some(key) => state.registers[register1] = key as u8,
