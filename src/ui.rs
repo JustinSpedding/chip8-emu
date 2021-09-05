@@ -11,7 +11,6 @@ use druid::{
 };
 use std::time::{Duration, Instant};
 
-const WINDOW_TITLE: LocalizedString<AppData> = LocalizedString::new("Hello World!");
 
 #[derive(Clone, Data, Lens)]
 struct AppData {
@@ -110,10 +109,7 @@ impl Widget<AppData> for Chip8Widget {
                                 x: w0 * col as f64,
                                 y: h0 * row as f64,
                             };
-                            let rect = Rect::from_origin_size(point, cell_size);
-
-                            // We devide by 2 so that the colour changes every 2 positions instead of every 1
-                            ctx.fill(rect, &Color::WHITE);
+                            ctx.fill(Rect::from_origin_size(point, cell_size), &Color::WHITE);
                         }
                     }
                 }
@@ -122,6 +118,7 @@ impl Widget<AppData> for Chip8Widget {
         }
     }
 }
+
 pub fn create_ui() {
     // describe the main window
     let main_window = WindowDesc::new(
@@ -137,7 +134,7 @@ pub fn create_ui() {
             .background(Color::BLACK),
     )
     .menu(|_, _, _| menu())
-    .title(WINDOW_TITLE)
+    .title(LocalizedString::new("CHIP-8 Emulator"))
     .window_size((400.0, 400.0));
 
     // create the initial app state
