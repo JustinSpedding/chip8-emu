@@ -1,5 +1,5 @@
-use crate::state::State;
 use crate::opcodes;
+use crate::state::State;
 
 static OPCODE_TABLE: [fn(&mut State, u16); 16] = [
     op_table_0,
@@ -182,8 +182,9 @@ static OPCODE_TABLE_F: [fn(&mut State, u16); 102] = [
     opcodes::op_FX65,
 ];
 
-fn op_none(state: &mut State, opcode: u16) {
+fn op_none(_state: &mut State, opcode: u16) {
     // TODO: what should we do here?
+    panic!("Invalid opcode: {:#06x}", opcode);
 }
 
 fn op_table_0(state: &mut State, opcode: u16) {
@@ -216,8 +217,8 @@ fn run_opcode(state: &mut State, opcode: u16) {
 }
 
 pub fn run_cycle(state: &mut State) {
-    let opcode = ((state.memory[state.pc as usize] as u16) << 8) | state.memory[state.pc as usize + 1] as u16;
-    state.pc += 2;
+    let opcode = ((state.memory[state.pc as usize] as u16) << 8) | state.memory[(state.pc.wrapping_add(1) % 4096) as usize] as u16;
+    state.pc = state.pc.wrapping_add(2) % 4096;
     run_opcode(state, opcode);
     if state.delay_timer > 0 {
         state.delay_timer -= 1;
