@@ -56,7 +56,7 @@ impl Widget<AppData> for Chip8Widget {
                     match &mut data.state {
                         Some(state) => {
                             if !data.paused {
-                                cpu::run_cycle(state);
+                                cpu::run_cycle(state, data.cycles_per_clock);
                                 ctx.request_paint();
                             }
                         }
@@ -96,8 +96,11 @@ impl Widget<AppData> for Chip8Widget {
 
     fn layout(&mut self, _layout_ctx: &mut LayoutCtx, bc: &BoxConstraints, _data: &AppData, _env: &Env) -> Size {
         let max_size = bc.max();
-        let min_side = max_size.height.min(max_size.width);
-        Size { width: min_side, height: min_side }
+        if max_size.width < max_size.height * 2. {
+            return Size { width: max_size.width, height: max_size.width / 2. }
+        } else {
+            return Size { width: max_size.height * 2., height: max_size.height }
+        }
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &AppData, _env: &Env) {
@@ -150,7 +153,7 @@ pub fn create_ui() {
     // create the initial app state
     let initial_state = AppData {
         state: None,
-        cycles_per_clock: 1,
+        cycles_per_clock: 4,
         paused: false,
     };
 
@@ -177,7 +180,6 @@ impl AppDelegate<AppData> for Delegate {
     fn command(&mut self, _ctx: &mut DelegateCtx, _target: Target, cmd: &Command, data: &mut AppData, _env: &Env) -> Handled {
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
             data.state = Some(init::init_state(file_info.path()));
-            println!("set state");
             return Handled::Yes;
         }
         Handled::No

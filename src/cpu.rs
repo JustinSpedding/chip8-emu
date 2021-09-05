@@ -216,10 +216,12 @@ fn run_opcode(state: &mut State, opcode: u16) {
     OPCODE_TABLE[index](state, opcode);
 }
 
-pub fn run_cycle(state: &mut State) {
-    let opcode = ((state.memory[state.pc as usize] as u16) << 8) | state.memory[(state.pc.wrapping_add(1) % 4096) as usize] as u16;
-    state.pc = state.pc.wrapping_add(2) % 4096;
-    run_opcode(state, opcode);
+pub fn run_cycle(state: &mut State, cycles_per_clock: u8) {
+    for _ in 0..cycles_per_clock {
+        let opcode = ((state.memory[state.pc as usize] as u16) << 8) | state.memory[(state.pc.wrapping_add(1) % 4096) as usize] as u16;
+        state.pc = state.pc.wrapping_add(2) % 4096;
+        run_opcode(state, opcode);
+    }
     if state.delay_timer > 0 {
         state.delay_timer -= 1;
     }
