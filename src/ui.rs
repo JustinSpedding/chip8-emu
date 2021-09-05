@@ -5,27 +5,11 @@ use druid::commands;
 use druid::menu::{Menu, MenuItem};
 use druid::widget::prelude::*;
 use druid::widget::Flex;
-use druid::AppDelegate;
-use druid::BoxConstraints;
-use druid::Color;
-use druid::Command;
-use druid::DelegateCtx;
-use druid::Event;
-use druid::EventCtx;
-use druid::Handled;
-use druid::LayoutCtx;
-use druid::LifeCycle;
-use druid::LifeCycleCtx;
-use druid::PaintCtx;
-use druid::Point;
-use druid::Rect;
-use druid::Size;
-use druid::Target;
-use druid::TimerToken;
-use druid::UpdateCtx;
-use druid::{AppLauncher, Data, Env, FileDialogOptions, FileSpec, Lens, LocalizedString, MouseButton, Widget, WidgetExt, WindowDesc};
-use std::time::Duration;
-use std::time::Instant;
+use druid::{
+    AppDelegate, AppLauncher, BoxConstraints, Color, Command, Data, DelegateCtx, Env, Event, EventCtx, FileDialogOptions, FileSpec, Handled, LayoutCtx, Lens, LifeCycle, LifeCycleCtx, LocalizedString,
+    MouseButton, PaintCtx, Point, Rect, Size, Target, TimerToken, UpdateCtx, Widget, WidgetExt, WindowDesc,
+};
+use std::time::{Duration, Instant};
 
 const WINDOW_TITLE: LocalizedString<AppData> = LocalizedString::new("Hello World!");
 
@@ -97,9 +81,15 @@ impl Widget<AppData> for Chip8Widget {
     fn layout(&mut self, _layout_ctx: &mut LayoutCtx, bc: &BoxConstraints, _data: &AppData, _env: &Env) -> Size {
         let max_size = bc.max();
         if max_size.width < max_size.height * 2. {
-            return Size { width: max_size.width, height: max_size.width / 2. }
+            return Size {
+                width: max_size.width,
+                height: max_size.width / 2.,
+            };
         } else {
-            return Size { width: max_size.height * 2., height: max_size.height }
+            return Size {
+                width: max_size.height * 2.,
+                height: max_size.height,
+            };
         }
     }
 
