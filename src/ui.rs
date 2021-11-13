@@ -29,6 +29,7 @@ impl Widget<AppData> for Chip8Widget {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppData, _env: &Env) {
         match event {
             Event::WindowConnected => {
+                ctx.request_focus();
                 ctx.request_paint();
                 let deadline = Duration::from_millis(17); // TODO: make this more accurate
                 self.last_update = Instant::now();
