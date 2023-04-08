@@ -40,10 +40,10 @@ pub fn init_state(rom_path: &Path) -> State {
     };
     state.memory[FONT_SET_START_ADDRESS..FONT_SET_START_ADDRESS + 80].clone_from_slice(&FONT_SET);
     load_rom(&mut state, rom_path);
-    return state;
+    state
 }
 
 fn load_rom(state: &mut State, rom_path: &Path) {
-    let mut f = fs::File::open(&rom_path).expect("no file found");
+    let mut f = fs::File::open(rom_path).expect("no file found");
     f.read(&mut state.memory[PROGRAM_START_ADDRESS as usize..4096]).expect("rom too large");
 }

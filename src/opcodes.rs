@@ -92,7 +92,7 @@ pub fn op_8XY4(state: &mut State, opcode: u16) {
     let register2 = ((opcode & 0x00F0) >> 4) as usize;
     let sum = (state.registers[register1] as u16).wrapping_add(state.registers[register2] as u16);
     state.registers[15] = if sum > 255 { 1 } else { 0 };
-    state.registers[register1 as usize] = sum as u8;
+    state.registers[register1] = sum as u8;
 }
 
 pub fn op_8XY5(state: &mut State, opcode: u16) {
