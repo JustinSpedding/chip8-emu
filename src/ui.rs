@@ -1,287 +1,239 @@
 use crate::cpu;
 use crate::init;
 use crate::state::State;
-use druid::commands;
-use druid::menu::{Menu, MenuItem};
-use druid::widget::prelude::*;
-use druid::widget::Flex;
-use druid::{
-    AppDelegate, AppLauncher, BoxConstraints, Color, Command, Data, DelegateCtx, Env, Event, EventCtx, FileDialogOptions, FileSpec, Handled, LayoutCtx, Lens, LifeCycle, LifeCycleCtx, LocalizedString,
-    MouseButton, PaintCtx, Point, Rect, Size, Target, TimerToken, UpdateCtx, Widget, WidgetExt, WindowDesc,
-};
-use std::time::{Duration, Instant};
+use iced::keyboard;
+use iced::mouse;
+use iced::widget::button;
+use iced::widget::canvas::Geometry;
+use iced::widget::row;
+use iced::widget::Canvas;
+use iced::widget::{canvas, column};
+use iced::Color;
+use iced::Point;
+use iced::Rectangle;
+use iced::Renderer;
+use iced::Size;
+use iced::{executor, time, Application, Command, Element, Length, Settings, Theme};
+use rfd::FileDialog;
+use std::time::Duration;
 
-#[derive(Clone, Data, Lens)]
-struct AppData {
+#[derive(Debug)]
+struct Chip8Emu {
     state: Option<State>,
-    cycles_per_clock: u8,
+    cycles_per_tick: u8,
+    ticks_per_second: u8,
     paused: bool,
+    canvas: Chip8EmuCanvas,
 }
 
-struct Chip8Widget {
-    timer_id: TimerToken,
-    cell_size: Size,
-    last_update: Instant,
+#[derive(Debug)]
+struct Chip8EmuFlags {
+    cycles_per_tick: u8,
+    ticks_per_second: u8,
 }
 
-impl Widget<AppData> for Chip8Widget {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppData, _env: &Env) {
-        match event {
-            Event::WindowConnected => {
-                ctx.request_focus();
-                ctx.request_paint();
-                let deadline = Duration::from_millis(17); // TODO: make this more accurate
-                self.last_update = Instant::now();
-                self.timer_id = ctx.request_timer(deadline);
-            }
-            Event::Timer(id) => {
-                if *id == self.timer_id {
-                    match &mut data.state {
-                        Some(state) => {
-                            if !data.paused {
-                                cpu::run_cycle(state, data.cycles_per_clock);
-                                ctx.request_paint();
-                            }
-                        }
-                        None => {}
-                    }
-                    let deadline = Duration::from_millis(17);
-                    self.last_update = Instant::now();
-                    self.timer_id = ctx.request_timer(deadline);
-                }
-            }
-            Event::MouseUp(e) => {
-                if e.button == MouseButton::Left {
-                    data.paused = !data.paused;
-                }
-            }
-            Event::KeyDown(e) => match &mut data.state {
-                Some(state) => match e.code {
-                    druid::Code::Digit0 => {
-                        state.keypad[0] = true;
-                    }
-                    druid::Code::Digit1 => {
-                        state.keypad[1] = true;
-                    }
-                    druid::Code::Digit2 => {
-                        state.keypad[2] = true;
-                    }
-                    druid::Code::Digit3 => {
-                        state.keypad[3] = true;
-                    }
-                    druid::Code::KeyQ => {
-                        state.keypad[4] = true;
-                    }
-                    druid::Code::KeyW => {
-                        state.keypad[5] = true;
-                    }
-                    druid::Code::KeyE => {
-                        state.keypad[6] = true;
-                    }
-                    druid::Code::KeyR => {
-                        state.keypad[7] = true;
-                    }
-                    druid::Code::KeyA => {
-                        state.keypad[8] = true;
-                    }
-                    druid::Code::KeyS => {
-                        state.keypad[9] = true;
-                    }
-                    druid::Code::KeyD => {
-                        state.keypad[10] = true;
-                    }
-                    druid::Code::KeyF => {
-                        state.keypad[11] = true;
-                    }
-                    druid::Code::KeyZ => {
-                        state.keypad[12] = true;
-                    }
-                    druid::Code::KeyX => {
-                        state.keypad[13] = true;
-                    }
-                    druid::Code::KeyC => {
-                        state.keypad[14] = true;
-                    }
-                    druid::Code::KeyV => {
-                        state.keypad[15] = true;
-                    }
-                    _ => {}
-                },
-                None => {}
-            },
-            Event::KeyUp(e) => match &mut data.state {
-                Some(state) => match e.code {
-                    druid::Code::Digit0 => {
-                        state.keypad[0] = false;
-                    }
-                    druid::Code::Digit1 => {
-                        state.keypad[1] = false;
-                    }
-                    druid::Code::Digit2 => {
-                        state.keypad[2] = false;
-                    }
-                    druid::Code::Digit3 => {
-                        state.keypad[3] = false;
-                    }
-                    druid::Code::KeyQ => {
-                        state.keypad[4] = false;
-                    }
-                    druid::Code::KeyW => {
-                        state.keypad[5] = false;
-                    }
-                    druid::Code::KeyE => {
-                        state.keypad[6] = false;
-                    }
-                    druid::Code::KeyR => {
-                        state.keypad[7] = false;
-                    }
-                    druid::Code::KeyA => {
-                        state.keypad[8] = false;
-                    }
-                    druid::Code::KeyS => {
-                        state.keypad[9] = false;
-                    }
-                    druid::Code::KeyD => {
-                        state.keypad[10] = false;
-                    }
-                    druid::Code::KeyF => {
-                        state.keypad[11] = false;
-                    }
-                    druid::Code::KeyZ => {
-                        state.keypad[12] = false;
-                    }
-                    druid::Code::KeyX => {
-                        state.keypad[13] = false;
-                    }
-                    druid::Code::KeyC => {
-                        state.keypad[14] = false;
-                    }
-                    druid::Code::KeyV => {
-                        state.keypad[15] = false;
-                    }
-                    _ => {}
-                },
-                None => {}
-            },
-            _ => {}
+#[derive(Debug, Clone)]
+pub enum Message {
+    GameTick,
+    TogglePause,
+    KeyDown(u8),
+    KeyUp(u8),
+    LoadRom,
+    SetCyclesPerTick(u8),
+    SetTicksPerSecond(u8),
+}
+
+impl Default for Chip8EmuFlags {
+    fn default() -> Self {
+        Self {
+            cycles_per_tick: 4,
+            ticks_per_second: 60,
         }
     }
+}
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _data: &AppData, _env: &Env) {}
+impl Application for Chip8Emu {
+    type Executor = executor::Default;
+    type Message = Message;
+    type Theme = Theme;
+    type Flags = Chip8EmuFlags;
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &AppData, data: &AppData, _env: &Env) {
-        match &data.state {
-            Some(state) => match &old_data.state {
-                Some(old_state) => {
-                    if state.video != old_state.video {
-                        ctx.request_paint();
-                    }
-                }
-                None => {
-                    ctx.request_paint();
-                }
+    fn new(flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
+        (
+            Self {
+                state: None,
+                cycles_per_tick: flags.cycles_per_tick,
+                ticks_per_second: flags.ticks_per_second,
+                paused: true,
+                canvas: Chip8EmuCanvas::default(),
             },
-            None => {}
-        }
+            Command::none(),
+        )
     }
 
-    fn layout(&mut self, _layout_ctx: &mut LayoutCtx, bc: &BoxConstraints, _data: &AppData, _env: &Env) -> Size {
-        let max_size = bc.max();
-        if max_size.width < max_size.height * 2. {
-            Size {
-                width: max_size.width,
-                height: max_size.width / 2.,
-            }
-        } else {
-            Size {
-                width: max_size.height * 2.,
-                height: max_size.height,
-            }
-        }
+    fn title(&self) -> String {
+        String::from("Chip-8 Emulator")
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &AppData, _env: &Env) {
-        match &data.state {
-            Some(state) => {
-                let size: Size = ctx.size();
-                let w0 = size.width / 64_f64;
-                let h0 = size.height / 32_f64;
-                let cell_size = Size { width: w0, height: h0 };
-                self.cell_size = cell_size;
-                for row in 0..32 {
-                    let video_row = state.video[row];
-                    for col in 0..64 {
-                        let bitmask = 1u64.rotate_right(col + 1);
-                        if video_row & bitmask != 0 {
-                            let point = Point {
-                                x: w0 * col as f64,
-                                y: h0 * row as f64,
-                            };
-                            ctx.fill(Rect::from_origin_size(point, cell_size), &Color::WHITE);
+    fn subscription(&self) -> iced::Subscription<Self::Message> {
+        iced::Subscription::batch(vec![
+            if !self.paused {
+                time::every(Duration::from_secs_f64(1. / (self.ticks_per_second as f64))).map(|_| Self::Message::GameTick)
+            } else {
+                iced::Subscription::none()
+            },
+            keyboard::on_key_press(|key, _modifiers| match key.as_ref() {
+                keyboard::key::Key::Character("0") => Some(Message::KeyDown(0)),
+                keyboard::key::Key::Character("1") => Some(Message::KeyDown(1)),
+                keyboard::key::Key::Character("2") => Some(Message::KeyDown(2)),
+                keyboard::key::Key::Character("3") => Some(Message::KeyDown(3)),
+                keyboard::key::Key::Character("Q") => Some(Message::KeyDown(4)),
+                keyboard::key::Key::Character("W") => Some(Message::KeyDown(5)),
+                keyboard::key::Key::Character("E") => Some(Message::KeyDown(6)),
+                keyboard::key::Key::Character("R") => Some(Message::KeyDown(7)),
+                keyboard::key::Key::Character("A") => Some(Message::KeyDown(8)),
+                keyboard::key::Key::Character("S") => Some(Message::KeyDown(9)),
+                keyboard::key::Key::Character("D") => Some(Message::KeyDown(10)),
+                keyboard::key::Key::Character("F") => Some(Message::KeyDown(11)),
+                keyboard::key::Key::Character("Z") => Some(Message::KeyDown(12)),
+                keyboard::key::Key::Character("X") => Some(Message::KeyDown(13)),
+                keyboard::key::Key::Character("C") => Some(Message::KeyDown(14)),
+                keyboard::key::Key::Character("V") => Some(Message::KeyDown(15)),
+                _ => None,
+            }),
+            keyboard::on_key_release(|key, _modifiers| match key.as_ref() {
+                keyboard::key::Key::Character("0") => Some(Message::KeyUp(0)),
+                keyboard::key::Key::Character("1") => Some(Message::KeyUp(1)),
+                keyboard::key::Key::Character("2") => Some(Message::KeyUp(2)),
+                keyboard::key::Key::Character("3") => Some(Message::KeyUp(3)),
+                keyboard::key::Key::Character("Q") => Some(Message::KeyUp(4)),
+                keyboard::key::Key::Character("W") => Some(Message::KeyUp(5)),
+                keyboard::key::Key::Character("E") => Some(Message::KeyUp(6)),
+                keyboard::key::Key::Character("R") => Some(Message::KeyUp(7)),
+                keyboard::key::Key::Character("A") => Some(Message::KeyUp(8)),
+                keyboard::key::Key::Character("S") => Some(Message::KeyUp(9)),
+                keyboard::key::Key::Character("D") => Some(Message::KeyUp(10)),
+                keyboard::key::Key::Character("F") => Some(Message::KeyUp(11)),
+                keyboard::key::Key::Character("Z") => Some(Message::KeyUp(12)),
+                keyboard::key::Key::Character("X") => Some(Message::KeyUp(13)),
+                keyboard::key::Key::Character("C") => Some(Message::KeyUp(14)),
+                keyboard::key::Key::Character("V") => Some(Message::KeyUp(15)),
+                keyboard::key::Key::Named(keyboard::key::Named::Space) => Some(Message::TogglePause),
+                _ => None,
+            }),
+        ])
+    }
+
+    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
+        match message {
+            Message::GameTick => match &mut self.state {
+                Some(state) => {
+                    if !self.paused {
+                        cpu::run_cycle(state, self.cycles_per_tick);
+                        if state.video != self.canvas.video {
+                            self.canvas.video = state.video;
+                            self.canvas.canvas_cache.clear();
                         }
                     }
                 }
+                None => {}
+            },
+            Message::TogglePause => {
+                self.paused = !self.paused;
             }
-            None => {}
+            Message::KeyDown(key_num) => match &mut self.state {
+                Some(state) => {
+                    state.keypad[key_num as usize] = true;
+                }
+                None => {}
+            },
+            Message::KeyUp(key_num) => match &mut self.state {
+                Some(state) => {
+                    state.keypad[key_num as usize] = false;
+                }
+                None => {}
+            },
+            Message::LoadRom => {
+                let rom_path = FileDialog::new()
+                    .add_filter("CHIP-8 ROM", &["ch8", "CH8"])
+                    .pick_file();
+                match rom_path {
+                    Some(rom_path) => {
+                        self.state = Some(init::init_state(rom_path.as_path()));
+                        self.paused = false;
+                    }
+                    None => {}
+                }
+            }
+            Message::SetCyclesPerTick(cycles_per_tick) => {
+                self.cycles_per_tick = cycles_per_tick;
+            }
+            Message::SetTicksPerSecond(ticks_per_second) => {
+                self.ticks_per_second = ticks_per_second;
+            }
         }
+        Command::none()
+    }
+
+    fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
+        column![
+            row([button("Load Rom").padding([5, 10]).on_press(Message::LoadRom).into()]),
+            row([self.canvas.view()]),
+        ].into()
     }
 }
 
 pub fn create_ui() {
-    // describe the main window
-    let main_window = WindowDesc::new(
-        Flex::column()
-            .with_flex_child(
-                Chip8Widget {
-                    timer_id: TimerToken::INVALID,
-                    cell_size: Size { width: 0.0, height: 0.0 },
-                    last_update: Instant::now(),
-                },
-                1.0,
-            )
-            .background(Color::BLACK),
-    )
-    .menu(|_, _, _| menu())
-    .title(LocalizedString::new("CHIP-8 Emulator"))
-    .window_size((400.0, 400.0));
-
-    // create the initial app state
-    let initial_state = AppData {
-        state: None,
-        cycles_per_clock: 4,
-        paused: false,
-    };
-
-    // start the application
-    AppLauncher::with_window(main_window).delegate(Delegate).launch(initial_state).expect("Failed to launch application");
+    Chip8Emu::run(Settings::default()).expect("Failed to launch application.");
 }
 
-fn menu() -> Menu<AppData> {
-    let chip8 = FileSpec::new("CHIP-8 ROM", &["ch8"]);
-    let open_dialog_options = FileDialogOptions::new()
-        .allowed_types(vec![chip8])
-        .default_type(chip8)
-        .name_label("CHIP-8 ROM")
-        .title("Choose a CHIP-8 ROM to load")
-        .button_text("Load");
-    Menu::empty().entry(
-        Menu::<AppData>::new(LocalizedString::new("File"))
-            .entry(
-                MenuItem::<AppData>::new(LocalizedString::new("Open ROM..."))
-                    .on_activate(move |ctx, _data, _env| ctx.submit_command(druid::commands::SHOW_OPEN_PANEL.with(open_dialog_options.clone()))),
-            )
-            .entry(MenuItem::<AppData>::new(LocalizedString::new("Preferences...")).on_activate(move |ctx, _data, _env| ctx.submit_command(druid::commands::SHOW_PREFERENCES))),
-    )
+#[derive(Debug, Default)]
+struct Chip8EmuCanvas {
+    canvas_cache: canvas::Cache,
+    video: [u64; 32],
 }
 
-struct Delegate;
+#[derive(Debug, Default)]
+struct Chip8EmuCanvasState {}
 
-impl AppDelegate<AppData> for Delegate {
-    fn command(&mut self, _ctx: &mut DelegateCtx, _target: Target, cmd: &Command, data: &mut AppData, _env: &Env) -> Handled {
-        if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
-            data.state = Some(init::init_state(file_info.path()));
-            return Handled::Yes;
-        }
-        Handled::No
+impl Chip8EmuCanvas {
+    pub fn view(&self) -> Element<Message> {
+        Canvas::new(self).width(Length::Fill).height(Length::Fill).into()
+    }
+}
+
+impl canvas::Program<Message> for Chip8EmuCanvas {
+    type State = Chip8EmuCanvasState;
+
+    fn draw(&self, _state: &Chip8EmuCanvasState, renderer: &Renderer, _theme: &Theme, bounds: Rectangle, _cursor: mouse::Cursor) -> Vec<Geometry> {
+        let screen = self.canvas_cache.draw(renderer, bounds.size(), |frame| {
+            let screen_size = frame.size();
+            let point_size = Size {
+                width: screen_size.width / 64.,
+                height: screen_size.height / 32.,
+            };
+
+            // Draw a black background
+            let background = iced::widget::canvas::Path::rectangle(Point::ORIGIN, screen_size);
+            frame.fill(&background, Color::BLACK);
+
+            // Draw each of the white pixels
+            frame.with_save(|frame| {
+                for row in 0..32 {
+                    let video_row = self.video[row];
+                    for col in 0..64 {
+                        let bitmask = 1u64.rotate_right(col + 1);
+                        if video_row & bitmask != 0 {
+                            let point = Point {
+                                x: point_size.width * col as f32,
+                                y: point_size.height * row as f32,
+                            };
+                            frame.fill_rectangle(point, point_size, Color::WHITE);
+                        }
+                    }
+                }
+            })
+        });
+        vec![screen]
     }
 }

@@ -1,10 +1,11 @@
 [package]
 name = "chip8"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-druid = { git = "https://github.com/linebender/druid.git" }
+iced = { version = "0.12", features = ["default", "smol", "canvas"] }
+rfd = "0.14.1"
 rand = "0.8.4"

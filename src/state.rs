@@ -1,6 +1,4 @@
-use druid::Data;
-
-#[derive(Clone, Data)]
+#[derive(Debug, Clone, Copy)]
 pub struct State {
     pub registers: [u8; 16],
     pub memory: [u8; 4096],
