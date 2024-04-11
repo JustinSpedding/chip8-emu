@@ -7,6 +7,8 @@ use iced::widget::button;
 use iced::widget::canvas::Geometry;
 use iced::widget::row;
 use iced::widget::Canvas;
+use iced::widget::Container;
+use iced::widget::Text;
 use iced::widget::{canvas, column};
 use iced::Color;
 use iced::Point;
@@ -14,6 +16,8 @@ use iced::Rectangle;
 use iced::Renderer;
 use iced::Size;
 use iced::{executor, time, Application, Command, Element, Length, Settings, Theme};
+use iced_aw::number_input;
+use iced_aw::NumberInputStyles;
 use rfd::FileDialog;
 use std::time::Duration;
 
@@ -177,8 +181,24 @@ impl Application for Chip8Emu {
 
     fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
         column![
-            row([button("Load Rom").padding([5, 10]).on_press(Message::LoadRom).into()]),
-            row([self.canvas.view()]),
+            row([
+                button("Load Rom").padding([5, 10]).on_press(Message::LoadRom).into(),
+                Container::new(Text::new("Cycles per tick:")).height(Length::Fill).padding([0, 0, 0, 25]).center_y().into(),
+                number_input(self.cycles_per_tick, 255, Message::SetCyclesPerTick)
+                    .style(NumberInputStyles::Default)
+                    .width(Length::Fixed(60.))
+                    .step(1)
+                    .into(),
+                Container::new(Text::new("Ticks per second:")).height(Length::Fill).padding([0, 0, 0, 25]).center_y().into(),
+                number_input(self.ticks_per_second, 250, Message::SetTicksPerSecond)
+                    .style(NumberInputStyles::Default)
+                    .width(Length::Fixed(60.))
+                    .step(10)
+                    .into(),
+            ]).height(Length::Shrink),
+            row([
+                self.canvas.view(),
+            ]).height(Length::Fill),
         ].into()
     }
 }
