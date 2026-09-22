@@ -1,12 +1,12 @@
 [package]
 name = "chip8"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iced = { version = "0.12", features = ["default", "smol", "canvas"] }
-iced_aw = { version = "0.8.0", default-features = false, features = ["number_input"] }
-rfd = "0.14.1"
-rand = "0.8.4"
+iced = { version = "0.14", features = ["default", "smol", "canvas"] }
+iced_aw = { version = "0.14.1", default-features = false, features = ["number_input"] }
+rand = "0.10.3"
+rfd = "0.17.2"

@@ -1,23 +1,14 @@
 use crate::cpu;
 use crate::init;
 use crate::state::State;
-use iced::keyboard;
-use iced::mouse;
-use iced::widget::button;
-use iced::widget::canvas::Geometry;
-use iced::widget::row;
-use iced::widget::Canvas;
-use iced::widget::Container;
-use iced::widget::Text;
-use iced::widget::{canvas, column};
-use iced::Color;
-use iced::Point;
-use iced::Rectangle;
-use iced::Renderer;
-use iced::Size;
-use iced::{executor, time, Application, Command, Element, Length, Settings, Theme};
+use iced::widget::canvas::{self, Canvas};
+use iced::widget::{Text, button, column, row};
+use iced::{
+    Alignment, Color, Element, Event, Length, Point, Rectangle, Size, Subscription, Task, Theme,
+    event::{Status, listen_with},
+    keyboard, mouse, time, window,
+};
 use iced_aw::number_input;
-use iced_aw::NumberInputStyles;
 use rfd::FileDialog;
 use std::time::Duration;
 
@@ -30,7 +21,7 @@ struct Chip8Emu {
     canvas: Chip8EmuCanvas,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct Chip8EmuFlags {
     cycles_per_tick: u8,
     ticks_per_second: u8,
@@ -56,117 +47,57 @@ impl Default for Chip8EmuFlags {
     }
 }
 
-impl Application for Chip8Emu {
-    type Executor = executor::Default;
-    type Message = Message;
-    type Theme = Theme;
-    type Flags = Chip8EmuFlags;
-
-    fn new(flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
-        (
-            Self {
-                state: None,
-                cycles_per_tick: flags.cycles_per_tick,
-                ticks_per_second: flags.ticks_per_second,
-                paused: true,
-                canvas: Chip8EmuCanvas::default(),
-            },
-            Command::none(),
-        )
+impl Chip8Emu {
+    fn new(flags: Chip8EmuFlags) -> Self {
+        Self {
+            state: None,
+            cycles_per_tick: flags.cycles_per_tick,
+            ticks_per_second: flags.ticks_per_second,
+            paused: true,
+            canvas: Chip8EmuCanvas::default(),
+        }
     }
 
-    fn title(&self) -> String {
-        String::from("Chip-8 Emulator")
+    fn subscription(&self) -> Subscription<Message> {
+        let game_tick = if self.paused {
+            Subscription::none()
+        } else {
+            time::every(Duration::from_secs_f64(1.0 / f64::from(self.ticks_per_second))).map(|_| Message::GameTick)
+        };
+
+        Subscription::batch([game_tick, listen_with(handle_event)])
     }
 
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
-        iced::Subscription::batch(vec![
-            if !self.paused {
-                time::every(Duration::from_secs_f64(1. / (self.ticks_per_second as f64))).map(|_| Self::Message::GameTick)
-            } else {
-                iced::Subscription::none()
-            },
-            keyboard::on_key_press(|key, _modifiers| match key.as_ref() {
-                keyboard::key::Key::Character("0") => Some(Message::KeyDown(0)),
-                keyboard::key::Key::Character("1") => Some(Message::KeyDown(1)),
-                keyboard::key::Key::Character("2") => Some(Message::KeyDown(2)),
-                keyboard::key::Key::Character("3") => Some(Message::KeyDown(3)),
-                keyboard::key::Key::Character("Q") => Some(Message::KeyDown(4)),
-                keyboard::key::Key::Character("W") => Some(Message::KeyDown(5)),
-                keyboard::key::Key::Character("E") => Some(Message::KeyDown(6)),
-                keyboard::key::Key::Character("R") => Some(Message::KeyDown(7)),
-                keyboard::key::Key::Character("A") => Some(Message::KeyDown(8)),
-                keyboard::key::Key::Character("S") => Some(Message::KeyDown(9)),
-                keyboard::key::Key::Character("D") => Some(Message::KeyDown(10)),
-                keyboard::key::Key::Character("F") => Some(Message::KeyDown(11)),
-                keyboard::key::Key::Character("Z") => Some(Message::KeyDown(12)),
-                keyboard::key::Key::Character("X") => Some(Message::KeyDown(13)),
-                keyboard::key::Key::Character("C") => Some(Message::KeyDown(14)),
-                keyboard::key::Key::Character("V") => Some(Message::KeyDown(15)),
-                _ => None,
-            }),
-            keyboard::on_key_release(|key, _modifiers| match key.as_ref() {
-                keyboard::key::Key::Character("0") => Some(Message::KeyUp(0)),
-                keyboard::key::Key::Character("1") => Some(Message::KeyUp(1)),
-                keyboard::key::Key::Character("2") => Some(Message::KeyUp(2)),
-                keyboard::key::Key::Character("3") => Some(Message::KeyUp(3)),
-                keyboard::key::Key::Character("Q") => Some(Message::KeyUp(4)),
-                keyboard::key::Key::Character("W") => Some(Message::KeyUp(5)),
-                keyboard::key::Key::Character("E") => Some(Message::KeyUp(6)),
-                keyboard::key::Key::Character("R") => Some(Message::KeyUp(7)),
-                keyboard::key::Key::Character("A") => Some(Message::KeyUp(8)),
-                keyboard::key::Key::Character("S") => Some(Message::KeyUp(9)),
-                keyboard::key::Key::Character("D") => Some(Message::KeyUp(10)),
-                keyboard::key::Key::Character("F") => Some(Message::KeyUp(11)),
-                keyboard::key::Key::Character("Z") => Some(Message::KeyUp(12)),
-                keyboard::key::Key::Character("X") => Some(Message::KeyUp(13)),
-                keyboard::key::Key::Character("C") => Some(Message::KeyUp(14)),
-                keyboard::key::Key::Character("V") => Some(Message::KeyUp(15)),
-                keyboard::key::Key::Named(keyboard::key::Named::Space) => Some(Message::TogglePause),
-                _ => None,
-            }),
-        ])
-    }
-
-    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::GameTick => match &mut self.state {
-                Some(state) => {
-                    if !self.paused {
-                        cpu::run_cycle(state, self.cycles_per_tick);
-                        if state.video != self.canvas.video {
-                            self.canvas.video = state.video;
-                            self.canvas.canvas_cache.clear();
-                        }
+            Message::GameTick => {
+                if let Some(state) = &mut self.state && !self.paused
+                {
+                    cpu::run_cycle(state, self.cycles_per_tick);
+                    if state.video != self.canvas.video {
+                        self.canvas.video = state.video;
+                        self.canvas.canvas_cache.clear();
                     }
                 }
-                None => {}
-            },
+            }
             Message::TogglePause => {
                 self.paused = !self.paused;
             }
-            Message::KeyDown(key_num) => match &mut self.state {
-                Some(state) => {
+            Message::KeyDown(key_num) => {
+                if let Some(state) = &mut self.state {
                     state.keypad[key_num as usize] = true;
                 }
-                None => {}
-            },
-            Message::KeyUp(key_num) => match &mut self.state {
-                Some(state) => {
+            }
+            Message::KeyUp(key_num) => {
+                if let Some(state) = &mut self.state {
                     state.keypad[key_num as usize] = false;
                 }
-                None => {}
-            },
+            }
             Message::LoadRom => {
-                let rom_path = FileDialog::new()
-                    .add_filter("CHIP-8 ROM", &["ch8", "CH8"])
-                    .pick_file();
-                match rom_path {
-                    Some(rom_path) => {
-                        self.state = Some(init::init_state(rom_path.as_path()));
-                        self.paused = false;
-                    }
-                    None => {}
+                let rom_path = FileDialog::new().add_filter("CHIP-8 ROM", &["ch8", "CH8"]).pick_file();
+                if let Some(rom_path) = rom_path {
+                    self.state = Some(init::init_state(rom_path.as_path()));
+                    self.paused = false;
                 }
             }
             Message::SetCyclesPerTick(cycles_per_tick) => {
@@ -176,35 +107,86 @@ impl Application for Chip8Emu {
                 self.ticks_per_second = ticks_per_second;
             }
         }
-        Command::none()
+
+        Task::none()
     }
 
-    fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
-        column![
-            row([
-                button("Load Rom").padding([5, 10]).on_press(Message::LoadRom).into(),
-                Container::new(Text::new("Cycles per tick:")).height(Length::Fill).padding([0, 0, 0, 25]).center_y().into(),
-                number_input(self.cycles_per_tick, 255, Message::SetCyclesPerTick)
-                    .style(NumberInputStyles::Default)
-                    .width(Length::Fixed(60.))
-                    .step(1)
-                    .into(),
-                Container::new(Text::new("Ticks per second:")).height(Length::Fill).padding([0, 0, 0, 25]).center_y().into(),
-                number_input(self.ticks_per_second, 250, Message::SetTicksPerSecond)
-                    .style(NumberInputStyles::Default)
-                    .width(Length::Fixed(60.))
-                    .step(10)
-                    .into(),
-            ]).height(Length::Shrink),
-            row([
-                self.canvas.view(),
-            ]).height(Length::Fill),
-        ].into()
+    fn view(&self) -> Element<'_, Message> {
+        let controls = row![
+            button("Load Rom").padding([5, 10]).on_press(Message::LoadRom),
+            Text::new("Cycles per tick:"),
+            number_input(&self.cycles_per_tick, 1..255, Message::SetCyclesPerTick)
+                .style(number_input::number_input::primary)
+                .width(Length::Fixed(60.0))
+                .step(1),
+            Text::new("Ticks per second:"),
+            number_input(&self.ticks_per_second, 1..250, Message::SetTicksPerSecond)
+                .style(number_input::number_input::primary)
+                .width(Length::Fixed(60.0))
+                .step(10),
+        ]
+        .spacing(10)
+        .padding(10)
+        .align_y(Alignment::Center)
+        .height(Length::Shrink);
+
+        column![controls, self.canvas.view()].width(Length::Fill).height(Length::Fill).into()
     }
 }
 
 pub fn create_ui() {
-    Chip8Emu::run(Settings::default()).expect("Failed to launch application.");
+    let flags = Chip8EmuFlags::default();
+
+    iced::application(move || Chip8Emu::new(flags), Chip8Emu::update, Chip8Emu::view)
+        .title("Chip-8 Emulator")
+        .subscription(Chip8Emu::subscription)
+        .font(iced_aw::ICED_AW_FONT_BYTES)
+        .run()
+        .expect("Failed to launch application.");
+}
+
+fn handle_event(event: Event, status: Status, _window: window::Id) -> Option<Message> {
+    if status == Status::Captured {
+        return None;
+    }
+
+    match event {
+        Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) => keypad_index(&key).map(Message::KeyDown),
+        Event::Keyboard(keyboard::Event::KeyReleased { key, .. }) => match keypad_index(&key) {
+            Some(key_num) => Some(Message::KeyUp(key_num)),
+            None => match key {
+                keyboard::Key::Named(keyboard::key::Named::Space) => Some(Message::TogglePause),
+                _ => None,
+            },
+        },
+        _ => None,
+    }
+}
+
+fn keypad_index(key: &keyboard::Key) -> Option<u8> {
+    let keyboard::Key::Character(character) = key.as_ref() else {
+        return None;
+    };
+
+    match character.to_ascii_uppercase().as_str() {
+        "0" => Some(0),
+        "1" => Some(1),
+        "2" => Some(2),
+        "3" => Some(3),
+        "Q" => Some(4),
+        "W" => Some(5),
+        "E" => Some(6),
+        "R" => Some(7),
+        "A" => Some(8),
+        "S" => Some(9),
+        "D" => Some(10),
+        "F" => Some(11),
+        "Z" => Some(12),
+        "X" => Some(13),
+        "C" => Some(14),
+        "V" => Some(15),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Default)]
@@ -217,7 +199,7 @@ struct Chip8EmuCanvas {
 struct Chip8EmuCanvasState {}
 
 impl Chip8EmuCanvas {
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         Canvas::new(self).width(Length::Fill).height(Length::Fill).into()
     }
 }
@@ -225,7 +207,7 @@ impl Chip8EmuCanvas {
 impl canvas::Program<Message> for Chip8EmuCanvas {
     type State = Chip8EmuCanvasState;
 
-    fn draw(&self, _state: &Chip8EmuCanvasState, renderer: &Renderer, _theme: &Theme, bounds: Rectangle, _cursor: mouse::Cursor) -> Vec<Geometry> {
+    fn draw(&self, _state: &Chip8EmuCanvasState, renderer: &iced::Renderer, _theme: &Theme, bounds: Rectangle, _cursor: mouse::Cursor) -> Vec<canvas::Geometry> {
         let screen = self.canvas_cache.draw(renderer, bounds.size(), |frame| {
             let screen_size = frame.size();
             let point_size = Size {
@@ -234,7 +216,7 @@ impl canvas::Program<Message> for Chip8EmuCanvas {
             };
 
             // Draw a black background
-            let background = iced::widget::canvas::Path::rectangle(Point::ORIGIN, screen_size);
+            let background = canvas::Path::rectangle(Point::ORIGIN, screen_size);
             frame.fill(&background, Color::BLACK);
 
             // Draw each of the white pixels
